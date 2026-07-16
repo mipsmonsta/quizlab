@@ -186,7 +186,7 @@ def get_quiz(quiz_id):
     if not quiz:
         return jsonify({'error': 'Quiz not found'}), 404
     q = dict(quiz)
-    q['questions'] = get_questions(quiz_id, include_answers=False)
+    q['questions'] = get_questions(quiz_id, include_answers=True)
     return jsonify(q)
 
 

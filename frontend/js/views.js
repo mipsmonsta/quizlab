@@ -424,6 +424,8 @@ async function renderQuiz(main, quizId) {
     const q = questions[currentIdx]
     const total = questions.length
     const answeredCount = questions.filter(qq => answers[qq.id] !== undefined).length
+    const answered = answers[q.id] !== undefined
+    const isCorrect = answered && answers[q.id] === q.correct
 
     // Progress dots
     const dots = questions.map((qq, i) =>
@@ -437,14 +439,55 @@ async function renderQuiz(main, quizId) {
       timerHtml = `<span class="font-mono tabular-nums ${urgent ? 'timer-urgent' : 'text-gray-500 dark:text-gray-400'}">⏱ ${fmtTime(remaining)}</span>`
     }
 
-    // Options
+    // Options with immediate feedback
     const optionsHtml = q.options.map((opt, oi) => {
-      const sel = answers[q.id] === oi ? 'selected' : ''
-      return `<button class="option-btn w-full text-left px-4 py-3 rounded-lg border ${sel ? 'selected border-blue-500' : 'border-gray-200 dark:border-gray-600'} bg-white dark:bg-gray-800 mb-2" data-oi="${oi}">
-        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full border text-xs font-medium mr-3 ${sel ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-300 dark:border-gray-500'}">${String.fromCharCode(65 + oi)}</span>
+      let btnClass = 'option-btn w-full text-left px-4 py-3 rounded-lg border bg-white dark:bg-gray-800 mb-2'
+      let badgeClass = 'inline-flex items-center justify-center w-6 h-6 rounded-full border text-xs font-medium mr-3'
+
+      if (answered) {
+        if (oi === q.correct) {
+          btnClass += ' correct border-green-500'
+          badgeClass += ' bg-green-500 text-white border-green-500'
+        } else if (oi === answers[q.id]) {
+          btnClass += ' wrong border-red-500'
+          badgeClass += ' bg-red-500 text-white border-red-500'
+        } else {
+          badgeClass += ' border-gray-300 dark:border-gray-500'
+        }
+      } else {
+        if (oi === answers[q.id]) {
+          btnClass += ' selected border-blue-500'
+          badgeClass += ' bg-blue-500 text-white border-blue-500'
+        } else {
+          badgeClass += ' border-gray-300 dark:border-gray-500'
+        }
+      }
+
+      return `<button class="${btnClass}" data-oi="${oi}" ${answered ? 'disabled' : ''}>
+        <span class="${badgeClass}">${String.fromCharCode(65 + oi)}</span>
         ${esc(opt)}
       </button>`
     }).join('')
+
+    // Feedback banner
+    let feedbackHtml = ''
+    if (answered) {
+      feedbackHtml = `
+        <div class="mt-4 flex items-center gap-2 text-sm font-medium ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
+          ${isCorrect ? '✓ Correct!' : '✗ Incorrect'}
+        </div>
+      `
+    }
+
+    // Explanation
+    let explanationHtml = ''
+    if (answered && q.explanation) {
+      explanationHtml = `
+        <div class="mt-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-sm text-gray-700 dark:text-gray-300">
+          ${esc(q.explanation)}
+        </div>
+      `
+    }
 
     main.innerHTML = `
       <div class="fade-in">
@@ -462,6 +505,8 @@ async function renderQuiz(main, quizId) {
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Question ${currentIdx + 1} of ${total} · ${answeredCount} answered</p>
           <p class="text-lg font-medium mb-5 leading-relaxed">${esc(q.question)}</p>
           <div id="options-container">${optionsHtml}</div>
+          ${feedbackHtml}
+          ${explanationHtml}
         </div>
 
         <div class="flex items-center justify-between">
@@ -484,7 +529,7 @@ async function renderQuiz(main, quizId) {
     if (optionsContainer) {
       optionsContainer.addEventListener('click', e => {
         const btn = e.target.closest('.option-btn')
-        if (!btn) return
+        if (!btn || btn.disabled) return
         const oi = parseInt(btn.dataset.oi)
         answers[q.id] = oi
         saveDebounced()
