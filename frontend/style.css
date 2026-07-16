@@ -1,0 +1,89 @@
+/* Timer urgency */
+.timer-urgent {
+  color: #ef4444;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Option cards */
+.option-btn {
+  transition: all 0.15s ease;
+}
+.option-btn:hover {
+  border-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.05);
+}
+.option-btn.selected {
+  border-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.12);
+}
+.option-btn.correct {
+  border-color: #22c55e;
+  background-color: rgba(34, 197, 94, 0.12);
+}
+.option-btn.wrong {
+  border-color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
+.dark .option-btn:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+}
+.dark .option-btn.selected {
+  background-color: rgba(59, 130, 246, 0.25);
+}
+.dark .option-btn.correct {
+  background-color: rgba(34, 197, 94, 0.25);
+}
+.dark .option-btn.wrong {
+  background-color: rgba(239, 68, 68, 0.25);
+}
+
+/* Progress dots */
+.progress-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.progress-dot.answered {
+  background-color: #3b82f6;
+}
+.progress-dot.unanswered {
+  background-color: #d1d5db;
+}
+.progress-dot.current {
+  box-shadow: 0 0 0 2px #3b82f6;
+}
+.dark .progress-dot.unanswered {
+  background-color: #4b5563;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* Fade transition */
+.fade-in {
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

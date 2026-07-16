@@ -1,0 +1,7 @@
+quizzes.db
+quizzes.db-wal
+quizzes.db-shm
+__pycache__/
+*.pyc
+*.log
+*.err
