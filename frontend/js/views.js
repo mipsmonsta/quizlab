@@ -167,7 +167,7 @@ async function renderSetDetail(main, setId) {
           ${setData.date ? `<p class="text-sm text-gray-500 dark:text-gray-400">${esc(setData.date)}</p>` : ''}
         </div>
         <div class="flex gap-2">
-          <a href="#/import" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">+ Add quiz</a>
+          <a href="#/import?set_id=${setId}" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">+ Add quiz</a>
           <button id="delete-set-btn" class="px-3 py-1.5 text-sm font-medium rounded-lg text-red-500 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Delete set</button>
         </div>
       </div>
@@ -226,7 +226,7 @@ async function renderSetDetail(main, setId) {
 
 // ── Import ────────────────────────────────────────────────────
 
-async function renderImport(main) {
+async function renderImport(main, preselectedSetId) {
   const sets = await api.listSets().catch(() => [])
 
   main.innerHTML = `
@@ -278,7 +278,7 @@ async function renderImport(main) {
         showSetImportPreview(data)
       } else if (hasQuizTitle && Array.isArray(data.questions) && data.questions.length) {
         errorEl.classList.add('hidden')
-        showQuizImportPreview(data, sets)
+        showQuizImportPreview(data, sets, preselectedSetId)
       } else {
         throw new Error('JSON must have "set_name"+"quizzes[]" or "title/quiz_title"+"questions[]"')
       }
@@ -289,12 +289,14 @@ async function renderImport(main) {
   })
 }
 
-function showQuizImportPreview(data, sets) {
+function showQuizImportPreview(data, sets, preselectedSetId) {
   const container = document.getElementById('import-preview')
   container.classList.remove('hidden')
 
   const title = data.title || data.quiz_title || 'Untitled Quiz'
-  const setOptions = sets.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')
+  const setOptions = sets.map(s =>
+    `<option value="${s.id}" ${s.id === preselectedSetId ? 'selected' : ''}>${esc(s.name)}</option>`
+  ).join('')
 
   container.innerHTML = `
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 fade-in">

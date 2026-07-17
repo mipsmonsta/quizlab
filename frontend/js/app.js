@@ -38,8 +38,10 @@ function render() {
     try {
       if (hash === '/' || hash === '') {
         await renderHome(main)
-      } else if (hash === '/import') {
-        renderImport(main)
+      } else if (hash.startsWith('/import')) {
+        const params = new URLSearchParams(hash.split('?')[1] || '')
+        const preselectedSetId = params.get('set_id') ? parseInt(params.get('set_id')) : null
+        renderImport(main, preselectedSetId)
       } else if (hash.startsWith('/quiz/')) {
         const id = parseInt(hash.split('/')[2])
         if (isNaN(id)) throw new Error('Invalid quiz ID')

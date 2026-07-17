@@ -54,6 +54,7 @@ Legacy formats (`title`/`question`/`correct` as index) are also accepted.
 - **Review** — See all questions with correct answers marked, your answers highlighted, and explanations.
 - **Dark/light theme** — Toggle in the nav bar. Preference saved in localStorage.
 - **Import preview** — Paste JSON or upload a file. Preview shows the parsed quiz before saving.
+- **Import into set** — Click "+ Add quiz" on a set detail page to go to the import page with that set pre-selected in the dropdown.
 - **Ungrouped quizzes** — Quizzes without a set appear at the bottom of the home page.
 
 ## API endpoints
