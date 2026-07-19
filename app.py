@@ -2,7 +2,7 @@ import json
 import os
 from flask import Flask, request, jsonify, send_from_directory, abort
 
-from db import get_conn, init_db
+from db import get_conn, init_db, get_term_links_for_question, get_terms_for_set, create_term, update_term_note, delete_term, link_term_to_question, unlink_term_from_question, get_quiz_set_id_for_question
 
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend')
 
@@ -21,6 +21,7 @@ def question_to_dict(q, include_answers=False):
         'question': q['question_text'],
         'type': q['question_type'],
         'options': json.loads(q['options_json']) if q['options_json'] else [],
+        'term_links': get_term_links_for_question(q['id']),
     }
     if include_answers:
         result['correct'] = q['correct_index']
@@ -58,6 +59,12 @@ def normalize_quiz(data):
     for q in data.get('questions', []):
         question_text = q.get('question') or q.get('question_text', '')
         options = q.get('options', [])
+        if isinstance(options, dict):
+            correct_key = q.get('correct')
+            if isinstance(correct_key, str) and correct_key in options:
+                keys = list(options.keys())
+                q['correct'] = keys.index(correct_key)
+            options = list(options.values())
 
         correct = q.get('correct')
         if correct is None or isinstance(correct, str):
@@ -78,6 +85,7 @@ def normalize_quiz(data):
             'options': options,
             'correct': correct,
             'explanation': q.get('explanation', ''),
+            'term_links': q.get('term_links', []),
         })
 
     return result
@@ -164,13 +172,25 @@ def import_quiz():
          quiz['time_limit_seconds'], quiz['set_id']),
     )
     quiz_id = cur.lastrowid
+    set_id = quiz.get('set_id')
 
     for q in quiz['questions']:
-        db.execute(
+        cur2 = db.execute(
             'INSERT INTO questions (quiz_id, question_text, question_type, options_json, correct_index, explanation) VALUES (?, ?, ?, ?, ?, ?)',
             (quiz_id, q['question'], q['type'],
              json.dumps(q['options']), q['correct'], q['explanation']),
         )
+        question_id = cur2.lastrowid
+
+        if set_id and q.get('term_links'):
+            for tl in q['term_links']:
+                term = create_term(set_id, tl['term_name'], tl.get('note', ''))
+                link_term_to_question(
+                    question_id, term['id'],
+                    tl.get('field', 'question'),
+                    tl.get('start', 0),
+                    tl.get('end', 0),
+                )
 
     db.commit()
 
@@ -273,11 +293,21 @@ def create_set():
             )
             qid = cur2.lastrowid
             for q in nq['questions']:
-                db.execute(
+                cur3 = db.execute(
                     'INSERT INTO questions (quiz_id, question_text, question_type, options_json, correct_index, explanation) VALUES (?, ?, ?, ?, ?, ?)',
                     (qid, q['question'], q['type'],
                      json.dumps(q['options']), q['correct'], q['explanation']),
                 )
+                question_id = cur3.lastrowid
+                if q.get('term_links'):
+                    for tl in q['term_links']:
+                        term = create_term(set_id, tl['term_name'], tl.get('note', ''))
+                        link_term_to_question(
+                            question_id, term['id'],
+                            tl.get('field', 'question'),
+                            tl.get('start', 0),
+                            tl.get('end', 0),
+                        )
 
     db.commit()
     result = dict(db.execute('SELECT * FROM quiz_sets WHERE id = ?', (set_id,)).fetchone())
@@ -318,6 +348,70 @@ def delete_set(set_id):
     db.execute('DELETE FROM quiz_sets WHERE id = ?', (set_id,))
     db.commit()
     return jsonify({'ok': True})
+
+
+# ── API: Terms ─────────────────────────────────────────────────────
+
+
+@app.route('/api/sets/<int:set_id>/terms', methods=['GET'])
+def list_terms(set_id):
+    terms = get_terms_for_set(set_id)
+    return jsonify(terms)
+
+
+@app.route('/api/sets/<int:set_id>/terms', methods=['POST'])
+def add_term(set_id):
+    data = request.get_json(force=True)
+    if not data or not data.get('name'):
+        return jsonify({'error': 'Missing required field: name'}), 400
+    term = create_term(set_id, data['name'].strip(), data.get('note', ''))
+    return jsonify(term), 201
+
+
+@app.route('/api/terms/<int:term_id>', methods=['PUT'])
+def edit_term(term_id):
+    data = request.get_json(force=True)
+    if data is None:
+        return jsonify({'error': 'Missing request body'}), 400
+    term = update_term_note(term_id, data.get('note', ''))
+    if not term:
+        return jsonify({'error': 'Term not found'}), 404
+    return jsonify(term)
+
+
+@app.route('/api/terms/<int:term_id>', methods=['DELETE'])
+def remove_term(term_id):
+    delete_term(term_id)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/questions/<int:question_id>/terms', methods=['POST'])
+def link_term(question_id):
+    data = request.get_json(force=True)
+    if not data or not data.get('term_id'):
+        return jsonify({'error': 'Missing required field: term_id'}), 400
+    link_id = link_term_to_question(
+        question_id, data['term_id'],
+        data.get('field', 'question'),
+        data.get('start_pos', 0),
+        data.get('end_pos', 0),
+    )
+    return jsonify({'id': link_id}), 201
+
+
+@app.route('/api/questions/<int:question_id>/terms/<int:link_id>', methods=['DELETE'])
+def unlink_term(question_id, link_id):
+    unlink_term_from_question(link_id)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/quizzes/<int:quiz_id>/set-id', methods=['GET'])
+def get_quiz_set_id(quiz_id):
+    db = get_db()
+    row = db.execute('SELECT quiz_set_id FROM quizzes WHERE id = ?', (quiz_id,)).fetchone()
+    if not row:
+        return jsonify({'error': 'Quiz not found'}), 404
+    return jsonify({'quiz_set_id': row['quiz_set_id']})
 
 
 # ── API: Attempts ─────────────────────────────────────────────────

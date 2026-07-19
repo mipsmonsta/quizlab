@@ -34,7 +34,7 @@ import app as quizlab_app
 
 @pytest.fixture(autouse=True)
 def clean_db():
-    for table in ['quiz_attempts', 'questions', 'quizzes', 'quiz_sets']:
+    for table in ['question_terms', 'terms', 'quiz_attempts', 'questions', 'quizzes', 'quiz_sets']:
         _test_conn.execute(f'DELETE FROM {table}')
     _test_conn.execute("DELETE FROM sqlite_sequence")
     _test_conn.commit()

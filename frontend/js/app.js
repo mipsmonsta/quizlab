@@ -54,6 +54,10 @@ function render() {
         const id = parseInt(hash.split('/')[2])
         if (isNaN(id)) throw new Error('Invalid quiz ID')
         await renderReview(main, id)
+      } else if (hash.startsWith('/set/') && hash.includes('/glossary')) {
+        const id = parseInt(hash.split('/')[2])
+        if (isNaN(id)) throw new Error('Invalid set ID')
+        await renderGlossary(main, id)
       } else if (hash.startsWith('/set/')) {
         const id = parseInt(hash.split('/')[2])
         if (isNaN(id)) throw new Error('Invalid set ID')

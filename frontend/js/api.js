@@ -26,6 +26,13 @@ class API {
   createSet(data)         { return this.request('POST', '/api/sets', data) }
   getSet(id)              { return this.request('GET', `/api/sets/${id}`) }
   deleteSet(id)           { return this.request('DELETE', `/api/sets/${id}`) }
+  getSetTerms(setId)      { return this.request('GET', `/api/sets/${setId}/terms`) }
+  createTerm(setId, data) { return this.request('POST', `/api/sets/${setId}/terms`, data) }
+  updateTerm(id, data)    { return this.request('PUT', `/api/terms/${id}`, data) }
+  deleteTerm(id)          { return this.request('DELETE', `/api/terms/${id}`) }
+  linkTerm(qid, data)     { return this.request('POST', `/api/questions/${qid}/terms`, data) }
+  unlinkTerm(qid, lid)    { return this.request('DELETE', `/api/questions/${qid}/terms/${lid}`) }
+  getQuizSetId(qid)       { return this.request('GET', `/api/quizzes/${qid}/set-id`) }
 }
 
 const api = new API()

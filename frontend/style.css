@@ -87,3 +87,125 @@
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Term links */
+.term-link {
+  color: #2563eb;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  border-bottom: 1px dashed #2563eb;
+  font-weight: 500;
+}
+.term-link:hover {
+  background-color: rgba(37, 99, 235, 0.08);
+}
+.dark .term-link {
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
+.dark .term-link:hover {
+  background-color: rgba(96, 165, 250, 0.15);
+}
+
+/* Term popover */
+.term-popover {
+  position: fixed;
+  z-index: 50;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.term-popover:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+.dark .term-popover {
+  background: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+.dark .term-popover:hover {
+  background: #1f2937;
+  border-color: #60a5fa;
+}
+
+/* Term modal overlay */
+.term-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.term-modal {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 480px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.term-modal h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.term-modal .note-text {
+  color: #374151;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.term-modal textarea {
+  width: 100%;
+  min-height: 80px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+  resize: vertical;
+  margin-bottom: 12px;
+}
+.term-modal textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  ring: 2px solid #3b82f6;
+}
+.dark .term-modal {
+  background: #1f2937;
+}
+.dark .term-modal .note-text {
+  color: #d1d5db;
+}
+.dark .term-modal textarea {
+  background: #111827;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+/* Term-enabled container for selection detection */
+.term-enabled {
+  position: relative;
+}
+
+/* Glossary */
+.glossary-term-row:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+.dark .glossary-term-row:hover {
+  background: rgba(59, 130, 246, 0.1);
+}

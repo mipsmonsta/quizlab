@@ -17,6 +17,23 @@ function statusBadge(at) {
   return `<span class="text-xs px-2 py-0.5 rounded-full bg-${color}-100 dark:bg-${color}-900 text-${color}-700 dark:text-${color}-300">${at.score}/${at.total}</span>`
 }
 
+// Term data lookup (avoids storing user text in HTML attributes)
+const _termData = {}
+
+// Global term-link click handler
+document.addEventListener('click', e => {
+  const link = e.target.closest('.term-link')
+  if (link) {
+    e.preventDefault()
+    const termId = parseInt(link.dataset.termId)
+    const td = _termData[termId]
+    if (td) showTermModal({ termName: td.name, note: td.note, termId, mode: 'edit' })
+  }
+})
+
+// Dismiss popover on outside click
+document.addEventListener('mousedown', dismissPopoverOnClick)
+
 // ── Home (quiz sets) ──────────────────────────────────────────
 
 async function renderHome(main) {
@@ -30,10 +47,19 @@ async function renderHome(main) {
       <div class="text-center py-20 fade-in">
         <div class="text-5xl mb-4 opacity-30">📦</div>
         <h2 class="text-xl font-semibold mb-2">No quiz sets yet</h2>
-        <p class="text-gray-500 dark:text-gray-400 mb-6">Import a quiz set from JSON to get started</p>
-        <a href="#/import" class="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Import Set</a>
+        <p class="text-gray-500 dark:text-gray-400 mb-6">Create a set to organize your quizzes, or import one from JSON</p>
+        <div class="flex gap-3 justify-center">
+          <button id="create-set-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">+ New Set</button>
+          <a href="#/import" class="px-6 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Import Set</a>
+        </div>
       </div>
     `
+
+    document.getElementById('create-set-btn')?.addEventListener('click', () => {
+      const name = prompt('Quiz set name:')
+      if (!name || !name.trim()) return
+      api.createSet({ name: name.trim() }).then(() => render()).catch(e => alert(e.message))
+    })
     return
   }
 
@@ -167,6 +193,7 @@ async function renderSetDetail(main, setId) {
           ${setData.date ? `<p class="text-sm text-gray-500 dark:text-gray-400">${esc(setData.date)}</p>` : ''}
         </div>
         <div class="flex gap-2">
+          <a href="#/set/${setId}/glossary" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Glossary</a>
           <a href="#/import?set_id=${setId}" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">+ Add quiz</a>
           <button id="delete-set-btn" class="px-3 py-1.5 text-sm font-medium rounded-lg text-red-500 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Delete set</button>
         </div>
@@ -243,6 +270,58 @@ async function renderImport(main, preselectedSetId) {
       </div>
       <p id="import-error" class="text-red-500 text-sm mt-2 hidden"></p>
     </div>
+    <details class="mb-6 fade-in">
+      <summary class="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors select-none">
+        Need the JSON format? Click to show examples
+      </summary>
+      <div class="mt-3 space-y-4">
+        <div>
+          <h4 class="text-sm font-semibold mb-1">Single Quiz</h4>
+          <pre class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 text-xs overflow-x-auto border border-gray-200 dark:border-gray-700"><code>{
+  "title": "Topic Quiz",
+  "description": "Optional description",
+  "time_limit_seconds": 600,
+  "questions": [
+    {
+      "question": "What is 2+2?",
+      "options": ["3", "4", "5", "6"],
+      "correct": 1,
+      "explanation": "2+2 = 4"
+    },
+    {
+      "question": "What color is the sky?",
+      "options": ["Red", "Blue", "Green", "Yellow"],
+      "correct_answer": "Blue",
+      "explanation": "The sky appears blue due to Rayleigh scattering"
+    }
+  ]
+}</code></pre>
+          <p class="text-xs text-gray-400 mt-1">Also accepted: <code>quiz_title</code> (alias for <code>title</code>), <code>question_text</code> (alias for <code>question</code>), <code>correct_answer</code> (text) or <code>correct</code> (0-based index).</p>
+        </div>
+        <div>
+          <h4 class="text-sm font-semibold mb-1">Quiz Set (multiple quizzes at once)</h4>
+          <pre class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 text-xs overflow-x-auto border border-gray-200 dark:border-gray-700"><code>{
+  "set_name": "Week 1 Review",
+  "set_date": "2026-07-16",
+  "quizzes": [
+    {
+      "title": "Quiz 1",
+      "questions": [
+        { "question": "Q1?", "options": ["A", "B"], "correct": 0 }
+      ]
+    },
+    {
+      "title": "Quiz 2",
+      "time_limit_seconds": 300,
+      "questions": [
+        { "question": "Q2?", "options": ["X", "Y", "Z"], "correct_answer": "Y" }
+      ]
+    }
+  ]
+}</code></pre>
+        </div>
+      </div>
+    </details>
     <div id="import-preview" class="hidden"></div>
   `
 
@@ -400,6 +479,9 @@ async function renderQuiz(main, quizId) {
 
   const quiz = await api.getQuiz(quizId)
   const questions = quiz.questions
+  questions.forEach(q => {
+    if (!Array.isArray(q.options)) q.options = []
+  })
   const timeLimit = quiz.time_limit_seconds
   const answers = attempt.answers || {}
   let currentIdx = attempt.current_question || 0
@@ -411,8 +493,32 @@ async function renderQuiz(main, quizId) {
   }
 
   let timerInterval = null
+  let timerPaused = false
   let submitting = false
   let cleanup = () => { if (timerInterval) clearInterval(timerInterval); timerInterval = null }
+
+  function pauseTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval)
+      timerInterval = null
+      timerPaused = true
+    }
+  }
+
+  function resumeTimer() {
+    if (timerPaused && remaining > 0) {
+      timerPaused = false
+      timerInterval = setInterval(() => {
+        remaining--
+        renderQuestion()
+        if (remaining <= 0) {
+          clearInterval(timerInterval)
+          timerInterval = null
+          submitQuiz(true)
+        }
+      }, 1000)
+    }
+  }
 
   const saveDebounced = debounce(async () => {
     try { await api.saveProgress(quizId, { answers, current_question: currentIdx }) } catch (_) {}
@@ -428,6 +534,12 @@ async function renderQuiz(main, quizId) {
     const answeredCount = questions.filter(qq => answers[qq.id] !== undefined).length
     const answered = answers[q.id] !== undefined
     const isCorrect = answered && answers[q.id] === q.correct
+
+    const questionTermLinks = (q.term_links || []).filter(tl => tl.field === 'question')
+    const optTermLinks = {}
+    q.options.forEach((_, oi) => {
+      optTermLinks[oi] = (q.term_links || []).filter(tl => tl.field === `option_${oi}`)
+    })
 
     // Progress dots
     const dots = questions.map((qq, i) =>
@@ -467,7 +579,7 @@ async function renderQuiz(main, quizId) {
 
       return `<button class="${btnClass}" data-oi="${oi}" ${answered ? 'disabled' : ''}>
         <span class="${badgeClass}">${String.fromCharCode(65 + oi)}</span>
-        ${esc(opt)}
+        ${renderRichText(opt, optTermLinks[oi])}
       </button>`
     }).join('')
 
@@ -486,7 +598,7 @@ async function renderQuiz(main, quizId) {
     if (answered && q.explanation) {
       explanationHtml = `
         <div class="mt-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-sm text-gray-700 dark:text-gray-300">
-          ${esc(q.explanation)}
+          ${renderRichText(q.explanation, (q.term_links || []).filter(tl => tl.field === 'explanation'))}
         </div>
       `
     }
@@ -505,7 +617,7 @@ async function renderQuiz(main, quizId) {
 
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-4">
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Question ${currentIdx + 1} of ${total} · ${answeredCount} answered</p>
-          <p class="text-lg font-medium mb-5 leading-relaxed">${esc(q.question)}</p>
+          <p id="question-text" class="text-lg font-medium mb-5 leading-relaxed">${renderRichText(q.question, questionTermLinks)}</p>
           <div id="options-container">${optionsHtml}</div>
           ${feedbackHtml}
           ${explanationHtml}
@@ -527,6 +639,7 @@ async function renderQuiz(main, quizId) {
     const nextBtn = document.getElementById('next-btn')
     const submitBtn = document.getElementById('submit-btn')
     const dotsContainer = document.getElementById('progress-dots')
+    const questionText = document.getElementById('question-text')
 
     if (optionsContainer) {
       optionsContainer.addEventListener('click', e => {
@@ -556,6 +669,11 @@ async function renderQuiz(main, quizId) {
     }
     if (submitBtn) {
       submitBtn.addEventListener('click', submitQuiz)
+    }
+
+    // Term selection on question text
+    if (quiz.quiz_set_id) {
+      setupTermSelection(questionText, quiz.quiz_set_id, q.id, 'question', pauseTimer, resumeTimer)
     }
   }
 
@@ -612,6 +730,7 @@ async function renderResults(main, quizId) {
     // Reconstruct from stored data
     const answers = attempt.answers || {}
     const questions = quiz.questions
+    questions.forEach(q => { if (!Array.isArray(q.options)) q.options = [] })
     const correctCount = attempt.score || 0
     const resultsList = questions.map(q => ({
       question: q,
@@ -643,21 +762,24 @@ async function renderResults(main, quizId) {
       <div class="space-y-3">
         ${r.results.map((res, i) => {
           const q = res.question
+          const qTermLinks = (q.term_links || []).filter(tl => tl.field === 'question')
           const selectedLabel = res.selected !== undefined && res.selected !== null ? q.options[res.selected] || '(skipped)' : '(skipped)'
           const correctLabel = q.options[q.correct]
+          const selectedTermLinks = res.selected !== undefined && res.selected !== null ? (q.term_links || []).filter(tl => tl.field === 'option_' + res.selected) : []
+          const correctTermLinks = (q.term_links || []).filter(tl => tl.field === 'option_' + q.correct)
           return `
             <div class="bg-white dark:bg-gray-800 rounded-xl border ${res.correct ? 'border-green-200 dark:border-green-800' : 'border-red-200 dark:border-red-800'} p-4">
               <div class="flex items-start gap-3">
                 <span class="text-lg mt-0.5">${res.correct ? '✅' : '❌'}</span>
                 <div class="flex-1 min-w-0">
-                  <p class="font-medium mb-2">${esc(q.question)}</p>
+                  <p class="font-medium mb-2">${renderRichText(q.question, qTermLinks)}</p>
                   <div class="text-sm space-y-1">
                     <p class="${res.correct ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
-                      Your answer: ${esc(selectedLabel)}
+                      Your answer: ${renderRichText(selectedLabel, selectedTermLinks)}
                     </p>
-                    ${!res.correct ? `<p class="text-green-600 dark:text-green-400">Correct: ${esc(correctLabel)}</p>` : ''}
+                    ${!res.correct ? `<p class="text-green-600 dark:text-green-400">Correct: ${renderRichText(correctLabel, correctTermLinks)}</p>` : ''}
                   </div>
-                  ${q.explanation ? `<p class="text-sm text-gray-500 dark:text-gray-400 mt-2 italic">${esc(q.explanation)}</p>` : ''}
+                  ${q.explanation ? `<p class="text-sm text-gray-500 dark:text-gray-400 mt-2 italic">${renderRichText(q.explanation, (q.term_links || []).filter(tl => tl.field === 'explanation'))}</p>` : ''}
                 </div>
               </div>
             </div>
@@ -688,8 +810,12 @@ async function renderReview(main, quizId) {
     return
   }
 
+  (quiz.questions || []).forEach(q => { if (!Array.isArray(q.options)) q.options = [] })
+
   const attempt = await api.getLatestAttempt(quizId).catch(() => null)
   const answers = attempt?.answers || {}
+
+  const quizSetId = quiz.quiz_set_id
 
   main.innerHTML = `
     <div class="fade-in">
@@ -704,25 +830,27 @@ async function renderReview(main, quizId) {
           const selectedLabel = selected !== undefined && selected !== null ? q.options[selected] : '(not answered)'
           const correctLabel = q.options[q.correct]
           const isCorrect = selected === q.correct
+          const qTermLinks = (q.term_links || []).filter(tl => tl.field === 'question')
           return `
             <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
               <div class="flex items-start gap-3">
                 <span class="text-sm font-mono text-gray-400 mt-0.5">${i + 1}</span>
                 <div class="flex-1 min-w-0">
-                  <p class="font-medium mb-3">${esc(q.question)}</p>
+                  <p class="font-medium mb-3 question-review-text">${renderRichText(q.question, qTermLinks)}</p>
                   <div class="space-y-2 mb-3">
                     ${q.options.map((opt, oi) => {
+                      const optTermLinks = (q.term_links || []).filter(tl => tl.field === 'option_' + oi)
                       let cls = 'border-gray-200 dark:border-gray-600'
                       let extra = ''
                       if (oi === q.correct) { cls = 'border-green-500 bg-green-50 dark:bg-green-900/20'; extra = ' ✓' }
                       else if (oi === selected && oi !== q.correct) { cls = 'border-red-500 bg-red-50 dark:bg-red-900/20'; extra = ' ✗' }
                       return `<div class="flex items-center px-3 py-2 rounded-lg border text-sm ${cls}">
                         <span class="w-6 h-6 flex items-center justify-center rounded-full border text-xs font-medium mr-3 ${oi === q.correct ? 'border-green-500 bg-green-500 text-white' : oi === selected ? 'border-red-500 bg-red-500 text-white' : 'border-gray-300 dark:border-gray-500'}">${String.fromCharCode(65 + oi)}</span>
-                        <span>${esc(opt)}${extra}</span>
+                        <span class="option-review-text">${renderRichText(opt, optTermLinks)}${extra}</span>
                       </div>`
                     }).join('')}
                   </div>
-                  ${q.explanation ? `<p class="text-sm text-gray-500 dark:text-gray-400 italic">💡 ${esc(q.explanation)}</p>` : ''}
+                  ${q.explanation ? `<p class="text-sm text-gray-500 dark:text-gray-400 italic">${renderRichText(q.explanation, (q.term_links || []).filter(tl => tl.field === 'explanation'))}</p>` : ''}
                 </div>
               </div>
             </div>
@@ -731,6 +859,34 @@ async function renderReview(main, quizId) {
       </div>
     </div>
   `
+
+  // Set up term selection on review question text and option text
+  if (quizSetId) {
+    setTimeout(() => {
+      document.querySelectorAll('.question-review-text').forEach((el, i) => {
+        setupTermSelection(el, quizSetId, quiz.questions[i].id, 'question')
+      })
+      document.querySelectorAll('.option-review-text').forEach((el, i) => {
+        let qIdx = 0, oi = i
+        // figure out which question/option this belongs to
+        const qContainers = document.querySelectorAll('.question-review-text')
+        let count = 0
+        for (let qi = 0; qi < qContainers.length; qi++) {
+          const qOpts = qContainers[qi].closest('.flex-1')?.querySelectorAll('.option-review-text') || []
+          if (count + qOpts.length > i) {
+            qIdx = qi
+            oi = i - count
+            break
+          }
+          count += qOpts.length
+        }
+        const q = quiz.questions[qIdx]
+        if (q) {
+          setupTermSelection(el, quizSetId, q.id, 'option_' + oi)
+        }
+      })
+    }, 50)
+  }
 }
 
 function esc(s) {
@@ -738,4 +894,237 @@ function esc(s) {
   const div = document.createElement('div')
   div.textContent = String(s)
   return div.innerHTML
+}
+
+function escLines(s) {
+  if (s == null) return ''
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/(?:\r\n|\r|\n)/g, '<br>')
+}
+
+// ── Term utilities ────────────────────────────────────────────
+
+function renderRichText(text, termLinks) {
+  if (!termLinks || termLinks.length === 0) return esc(text)
+  const sorted = [...termLinks].sort((a, b) => a.start_pos - b.start_pos)
+  let result = ''
+  let pos = 0
+  for (const tl of sorted) {
+    if (tl.start_pos > pos) {
+      result += esc(text.slice(pos, tl.start_pos))
+    }
+    _termData[tl.term_id] = { name: tl.term_name, note: tl.note }
+    result += `<a class="term-link" data-term-id="${tl.term_id}">${esc(text.slice(tl.start_pos, tl.end_pos))}</a>`
+    pos = tl.end_pos
+  }
+  if (pos < text.length) {
+    result += esc(text.slice(pos))
+  }
+  return result
+}
+
+function getTextOffset(container, node, offset) {
+  let charCount = 0
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null)
+  while (walker.nextNode()) {
+    if (walker.currentNode === node) return charCount + offset
+    charCount += walker.currentNode.textContent.length
+  }
+  return charCount + offset
+}
+
+let _pendingTermSel = null
+
+function showTermModal({ termName, note, termId, mode, quizSetId, questionId, field, startPos, endPos, pauseTimer, resumeTimer }) {
+  if (pauseTimer) pauseTimer()
+  const overlay = document.createElement('div')
+  overlay.className = 'term-modal-overlay'
+  overlay.id = 'term-modal-overlay'
+  const isNew = mode === 'create'
+  overlay.innerHTML = `
+    <div class="term-modal">
+      <h3>${isNew ? esc('Create term: ' + termName) : esc(termName)}</h3>
+      ${!isNew ? `<p class="note-text">${note ? escLines(note) : '<span class="text-gray-400 italic">No note yet</span>'}</p>` : ''}
+      <p class="text-sm text-gray-500 mb-2">Note:</p>
+      <textarea id="term-note-input" placeholder="Write a note to help you remember this concept..."></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center">
+        ${!isNew ? `<button id="term-delete-btn" style="margin-right:auto;color:#ef4444;background:none;border:none;cursor:pointer;font-size:13px;padding:4px 8px">Delete</button>` : ''}
+        <button id="term-cancel-btn" class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+        <button id="term-save-btn" class="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">${isNew ? 'Create' : 'Save'}</button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+  const textarea = document.getElementById('term-note-input')
+  if (textarea) textarea.value = note || ''
+
+  document.getElementById('term-save-btn').addEventListener('click', async () => {
+    const newNote = document.getElementById('term-note-input').value
+    if (isNew) {
+      try {
+        const term = await api.createTerm(quizSetId, { name: termName, note: newNote })
+        if (questionId != null) {
+          await api.linkTerm(questionId, { term_id: term.id, field, start_pos: startPos, end_pos: endPos })
+        }
+      } catch (e) { alert('Failed to create term: ' + e.message) }
+    } else {
+      try { await api.updateTerm(termId, { note: newNote }) } catch (e) { alert('Failed to update note: ' + e.message) }
+    }
+    dismissTermModal()
+    if (resumeTimer) resumeTimer()
+    render()
+  })
+
+  document.getElementById('term-cancel-btn').addEventListener('click', () => {
+    dismissTermModal()
+    if (resumeTimer) resumeTimer()
+  })
+
+  const delBtn = document.getElementById('term-delete-btn')
+  if (delBtn) {
+    delBtn.addEventListener('click', async () => {
+      if (!confirm('Delete this term and unlink it from all questions?')) return
+      try { await api.deleteTerm(termId) } catch (e) { alert('Failed to delete: ' + e.message) }
+      dismissTermModal()
+      if (resumeTimer) resumeTimer()
+      render()
+    })
+  }
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) { dismissTermModal(); if (resumeTimer) resumeTimer() }
+  })
+
+  setTimeout(() => document.getElementById('term-note-input')?.focus(), 100)
+}
+
+function dismissTermModal() {
+  const overlay = document.getElementById('term-modal-overlay')
+  if (overlay) overlay.remove()
+}
+
+function setupTermSelection(container, quizSetId, questionId, field, pauseTimer, resumeTimer) {
+  if (!container) return
+  container.classList.add('term-enabled')
+
+  container.addEventListener('mouseup', function (e) {
+    if (e.target.closest('.term-link')) return
+    setTimeout(() => {
+      const sel = window.getSelection()
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+        document.querySelector('.term-popover')?.remove()
+        _pendingTermSel = null
+        return
+      }
+      const text = sel.toString().trim()
+      if (text.length === 0) return
+
+      if (!container.contains(sel.getRangeAt(0).commonAncestorContainer)) return
+
+      const range = sel.getRangeAt(0)
+      const startPos = getTextOffset(container, range.startContainer, range.startOffset)
+      const endPos = startPos + text.length
+
+      document.querySelector('.term-popover')?.remove()
+
+      const popover = document.createElement('div')
+      popover.className = 'term-popover'
+      popover.textContent = '+ Create term'
+      popover.style.left = (e.clientX + 10) + 'px'
+      popover.style.top = (e.clientY + 10) + 'px'
+      document.body.appendChild(popover)
+
+      _pendingTermSel = { text, startPos, endPos, quizSetId, questionId, field }
+
+      popover.addEventListener('click', () => {
+        popover.remove()
+        const ps = _pendingTermSel
+        _pendingTermSel = null
+        if (!ps) return
+        showTermModal({
+          termName: ps.text, note: '', mode: 'create',
+          quizSetId: ps.quizSetId, questionId: ps.questionId,
+          field: ps.field, startPos: ps.startPos, endPos: ps.endPos,
+          pauseTimer, resumeTimer,
+        })
+      })
+    }, 10)
+  })
+}
+
+function dismissPopoverOnClick(e) {
+  if (!e.target.closest('.term-popover') && !e.target.closest('.term-modal-overlay')) {
+    document.querySelector('.term-popover')?.remove()
+  }
+}
+
+// ── Glossary ──────────────────────────────────────────────────
+
+async function renderGlossary(main, setId) {
+  const [setData, terms] = await Promise.all([
+    api.getSet(setId),
+    api.getSetTerms(setId),
+  ])
+
+  main.innerHTML = `
+    <div class="fade-in">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <a href="#/set/${setId}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline mb-1 inline-block">← ${esc(setData.name)}</a>
+          <h2 class="text-2xl font-bold">Glossary</h2>
+        </div>
+        <button id="add-term-btn" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">+ Add term</button>
+      </div>
+
+      ${!terms.length
+        ? '<p class="text-gray-400 text-center py-12">No terms yet. Select text in a question to create one.</p>'
+        : `<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+             <table class="w-full text-sm">
+               <thead>
+                 <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                   <th class="text-left px-4 py-3 font-medium">Term</th>
+                   <th class="text-left px-4 py-3 font-medium">Note</th>
+                   <th class="text-right px-4 py-3 font-medium">Actions</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 ${terms.map(t => `
+                   <tr class="glossary-term-row border-b border-gray-100 dark:border-gray-700/50">
+                     <td class="px-4 py-3 font-medium">${esc(t.name)}</td>
+                     <td class="px-4 py-3 text-gray-500 dark:text-gray-400 max-w-xs truncate">${t.note ? esc(t.note) : '<span class="italic">No note</span>'}</td>
+                     <td class="px-4 py-3 text-right">
+                       <button class="edit-term-btn text-blue-600 dark:text-blue-400 hover:underline mr-3" data-id="${t.id}" data-name="${esc(t.name)}" data-note="${esc(t.note || '')}">Edit</button>
+                       <button class="delete-term-btn text-red-500 hover:underline" data-id="${t.id}" data-name="${esc(t.name)}">Delete</button>
+                     </td>
+                   </tr>
+                 `).join('')}
+               </tbody>
+             </table>
+           </div>`
+      }
+    </div>
+  `
+
+  document.getElementById('add-term-btn')?.addEventListener('click', () => {
+    const name = prompt('Term name:')
+    if (!name || !name.trim()) return
+    showTermModal({
+      termName: name.trim(), note: '', mode: 'create',
+      quizSetId: setId, questionId: null, field: 'question',
+      startPos: 0, endPos: 0,
+    })
+  })
+
+  main.addEventListener('click', e => {
+    const editBtn = e.target.closest('.edit-term-btn')
+    const delBtn = e.target.closest('.delete-term-btn')
+    if (editBtn) {
+      const { id, name, note } = editBtn.dataset
+      showTermModal({ termName: name, note, termId: parseInt(id), mode: 'edit' })
+    }
+    if (delBtn) {
+      const id = parseInt(delBtn.dataset.id)
+      if (!confirm(`Delete term "${delBtn.dataset.name}"?`)) return
+      api.deleteTerm(id).then(() => render()).catch(e => alert(e.message))
+    }
+  })
 }
