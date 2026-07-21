@@ -1087,16 +1087,16 @@ async function renderGlossary(main, setId) {
                  </tr>
                </thead>
                <tbody>
-                 ${terms.map(t => `
-                   <tr class="glossary-term-row border-b border-gray-100 dark:border-gray-700/50">
-                     <td class="px-4 py-3 font-medium">${esc(t.name)}</td>
-                     <td class="px-4 py-3 text-gray-500 dark:text-gray-400 max-w-xs truncate">${t.note ? esc(t.note) : '<span class="italic">No note</span>'}</td>
-                     <td class="px-4 py-3 text-right">
-                       <button class="edit-term-btn text-blue-600 dark:text-blue-400 hover:underline mr-3" data-id="${t.id}" data-name="${esc(t.name)}" data-note="${esc(t.note || '')}">Edit</button>
-                       <button class="delete-term-btn text-red-500 hover:underline" data-id="${t.id}" data-name="${esc(t.name)}">Delete</button>
-                     </td>
-                   </tr>
-                 `).join('')}
+                  ${terms.map(t => `
+                    <tr class="glossary-term-row border-b border-gray-100 dark:border-gray-700/50 cursor-pointer" data-id="${t.id}" data-name="${esc(t.name)}" data-note="${esc(t.note || '')}">
+                      <td class="px-4 py-3 font-medium">${esc(t.name)}</td>
+                      <td class="px-4 py-3 text-gray-500 dark:text-gray-400 max-w-xs truncate">${t.note ? esc(t.note) : '<span class="italic">No note</span>'}</td>
+                      <td class="px-4 py-3 text-right">
+                        <button class="edit-term-btn text-blue-600 dark:text-blue-400 hover:underline mr-3" data-id="${t.id}" data-name="${esc(t.name)}" data-note="${esc(t.note || '')}">Edit</button>
+                        <button class="delete-term-btn text-red-500 hover:underline" data-id="${t.id}" data-name="${esc(t.name)}">Delete</button>
+                      </td>
+                    </tr>
+                  `).join('')}
                </tbody>
              </table>
            </div>`
@@ -1115,16 +1115,19 @@ async function renderGlossary(main, setId) {
   })
 
   main.addEventListener('click', e => {
+    const row = e.target.closest('.glossary-term-row')
     const editBtn = e.target.closest('.edit-term-btn')
     const delBtn = e.target.closest('.delete-term-btn')
     if (editBtn) {
       const { id, name, note } = editBtn.dataset
       showTermModal({ termName: name, note, termId: parseInt(id), mode: 'edit' })
-    }
-    if (delBtn) {
+    } else if (delBtn) {
       const id = parseInt(delBtn.dataset.id)
       if (!confirm(`Delete term "${delBtn.dataset.name}"?`)) return
       api.deleteTerm(id).then(() => render()).catch(e => alert(e.message))
+    } else if (row && !e.target.closest('button')) {
+      const { id, name, note } = row.dataset
+      showTermModal({ termName: name, note, termId: parseInt(id), mode: 'edit' })
     }
   })
 }

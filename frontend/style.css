@@ -169,6 +169,7 @@
   margin-bottom: 16px;
   overflow-wrap: break-word;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 .term-modal textarea {
   width: 100%;
